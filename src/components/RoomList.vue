@@ -5,19 +5,18 @@
         </header>
         <main>
             <el-menu
-                default-active="2"
+                default-active="0"
                 class="el-menu-vertical-demo"
-                @open="handleOpen"
-                @close="handleClose"
                 background-color="#545c64"
                 text-color="#fff"
                 active-text-color="#ffd04b"
+                @select="onSelect"
             >
                 <el-menu-item
                     v-for="(room, i) in roomList"
                     :key="room.roomName"
                     class="clickable room-title"
-                    :index="i"
+                    :index="String(i)"
                 >
                     <i class="el-icon-menu"></i>
                     <span>{{ room.roomName }}</span>
@@ -60,13 +59,20 @@ export default {
             roomList: [],
             roomName: "",
             roomPassword: "",
-            dialogVisible: false
+            dialogVisible: false,
+            selected: null
         };
     },
+    created() {},
     mounted() {
         this.initConfig();
+        this.onSelect(0);
     },
     methods: {
+        onSelect(index) {
+            this.selected = this.roomList[index];
+            this.$emit("select", this.selected);
+        },
         onConfirmAddRoom() {
             if (!this.roomName || !this.roomPassword) {
                 this.$alert("no name or no pwd");
