@@ -16,11 +16,12 @@
             :multiple="true"
             :drop="true"
             :drop-directory="true"
-            v-model="files"
+            @input="onFiles"
+            :value="files"
             ref="uspload"
         >
             <el-button type="primary">
-                <i class="el-icon-upload"></i> 选择.xls文件或者拖进来</el-button
+                <i class="el-icon-upload"></i> Upload</el-button
             >
         </file-upload>
         <div>
@@ -62,6 +63,11 @@ export default Vue.extend({
         room: Object
     },
     methods: {
+        onFiles(files) {
+            console.log(files);
+            this.$emit("filesChange", files);
+            this.files = files;
+        },
         showPassword() {
             console.log("show");
             this.showPasswordDialogVisible = true;
@@ -79,9 +85,9 @@ export default Vue.extend({
         };
     },
     watch: {
-        files(files) {
-            console.log(files);
-        }
+        // files(files) {
+        //     console.log(files);
+        // }
     },
     components: {
         FileUpload

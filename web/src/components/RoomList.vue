@@ -45,12 +45,6 @@
 </template>
 
 <script lang="ts">
-import crypto from "crypto-js";
-function hash(message) {
-    return crypto.SHA512(message).toString();
-}
-console.log(crypto.AES.encrypt("a", "b").toString());
-console.log(hash("123"));
 export default {
     name: "RoomList",
     data() {
@@ -96,24 +90,30 @@ export default {
             } catch (e) {
                 this.roomList = [];
             }
-            console.log(this.roomList);
         },
         syncConfig() {
             localStorage.setItem(this.configKey, JSON.stringify(this.roomList));
         },
         addRoom() {
-            console.log("add room");
             this.dialogVisible = true;
         },
         handleClose(done) {
             this.$confirm("Are you sure to close this dialog?")
-                .then(_ => {
+                .then(() => {
                     done();
                 })
                 .catch(() => {});
         }
     },
-    components: {}
+    components: {},
+    watch: {
+        roomList: {
+            immediate: false,
+            handler(roomList) {
+                this.$emit("roomList", roomList);
+            }
+        }
+    }
 };
 </script>
 <style>
