@@ -6,7 +6,9 @@
   "private": true,
   "scripts": {
     "start": "ts-node src/serve.ts --extensions '.ts,.js'",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "gen": "openssl genrsa -out rsa_1024_priv.pem 1024 && openssl rsa -pubout -in rsa_1024_priv.pem -out rsa_1024_pub.pem
+    "
   },
   "keywords": [],
   "author": "",
@@ -16,6 +18,7 @@
     "eslint": "^8.13.0"
   },
   "dependencies": {
+    "crypto-js": "^4.1.1",
     "koa": "^2.13.4",
     "koa-body": "^4.2.0",
     "koa-json": "^2.0.2",
