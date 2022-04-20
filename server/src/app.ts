@@ -13,7 +13,11 @@ app.use(convert(json()));
 if (config.local) {
     app.use((ctx, next) => {
         //local only
-        if (ctx.ip !== "::1" && ctx.ip !== "::ffff:127.0.0.1") {
+        if (
+            ctx.ip !== "::1" &&
+            ctx.ip !== "::ffff:127.0.0.1" &&
+            !ctx.ip.startsWith("::ffff:192.168.")
+        ) {
             console.log("wrong ip", ctx.ip);
             ctx.status = 401;
             return;

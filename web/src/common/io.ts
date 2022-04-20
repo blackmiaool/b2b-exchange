@@ -3,7 +3,7 @@ import config from "../config";
 import { AnyMap } from "./types";
 
 export function request({ method, data }: { method: string; data?: AnyMap }): Promise<any> {
-    const origin = "http://localhost:" + config.port;
+    const origin = `http://${config.server}:${config.port}`;
     return axios
         .post(
             `${origin}/${method}`,
@@ -11,7 +11,7 @@ export function request({ method, data }: { method: string; data?: AnyMap }): Pr
                 data
             },
             {
-                withCredentials: true
+                withCredentials: false
             }
         )
         .then(result => {

@@ -57,13 +57,15 @@ export default {
             selected: null
         };
     },
-    created() {},
-    mounted() {
+    created() {
         this.initConfig();
+    },
+    mounted() {
         this.onSelect(0);
     },
     methods: {
         onSelect(index) {
+            console.log("on", this.roomList, index);
             this.selected = this.roomList[index];
             this.$emit("select", this.selected);
         },
@@ -82,6 +84,7 @@ export default {
             });
             this.syncConfig();
             this.dialogVisible = false;
+            this.$emit("roomList", this.roomList);
         },
         initConfig() {
             try {
@@ -90,6 +93,7 @@ export default {
             } catch (e) {
                 this.roomList = [];
             }
+            this.$emit("roomList", this.roomList);
         },
         syncConfig() {
             localStorage.setItem(this.configKey, JSON.stringify(this.roomList));
@@ -105,15 +109,7 @@ export default {
                 .catch(() => {});
         }
     },
-    components: {},
-    watch: {
-        roomList: {
-            immediate: false,
-            handler(roomList) {
-                this.$emit("roomList", roomList);
-            }
-        }
-    }
+    components: {}
 };
 </script>
 <style>

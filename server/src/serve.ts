@@ -2,7 +2,7 @@ import app from "./app";
 import Router from "koa-router";
 import config from "./config";
 import nodeRSA from "node-rsa";
-import { decrypt, hash } from "./common/crypto";
+import { decrypt, encrypt, hash } from "./common/crypto";
 import LiveMap from "./common/liveMap";
 const router = new Router();
 
@@ -52,7 +52,12 @@ router.use(async (ctx, next) => {
     return next();
     // ctx.router available
 });
-const liveMap = new LiveMap({
+const liveMap = new LiveMap<{
+    AESKey: string;
+    roomsInfo: {
+        files: { size: number; name: string };
+    };
+}>({
     timeout: 3e4,
 });
 
@@ -60,13 +65,49 @@ router.post("/(.*)", async (ctx) => {
     const method = ctx.request.url.replace(/^\//, "");
     const data = ctx.request.body.data;
     // console.log(ctx.request.body);
+    const allInfo = liveMap.getAll();
+    let AESKey;
+    let request;
+    let requestId;
+
+    if (data.id && data.d) {
+        const info = allInfo.get(data.id);
+        if (!info) {
+            return;
+        }
+        AESKey = info.data.AESKey;
+        console.log(data, AESKey);
+        request = JSON.parse(decrypt(data.d, AESKey));
+        requestId = data.id;
+    }
+    // console.log(allInfo.get("35cd9416345f3af")?.data);
     switch (method) {
+        case "getRoomInfo": {
+            const ret = [];
+            for (const [id, { data }] of allInfo) {
+                if (id === requestId) {
+                    continue;
+                }
+                for (const hash in data.roomsInfo) {
+                    if (hash === request.roomHash) {
+                        ret.push({
+                            hash,
+                            room: data.roomsInfo[hash],
+                            id,
+                        });
+                    }
+                }
+            }
+            ctx.body = encrypt(JSON.stringify(ret), AESKey);
+            ctx.status = 200;
+            break;
+        }
         case "ping": {
             let basicInfo;
             let id;
             try {
                 basicInfo = JSON.parse(rsakey.decrypt(data.e, "utf8"));
-                id = hash(basicInfo.AESKey, config.aesSalt).slice(0, 15);
+                id = hash(basicInfo.AESKey, config.aesSalt);
             } catch (e) {
                 ctx.body = "can't decode";
                 ctx.status = 401;
@@ -74,12 +115,13 @@ router.post("/(.*)", async (ctx) => {
             }
             const roomsInfo = JSON.parse(decrypt(data.i, basicInfo.AESKey));
             // console.log(result);
-            console.log("basicInfo", basicInfo, id);
-            console.log(roomsInfo);
+            // console.log("basicInfo", basicInfo, id);
+            // console.log(roomsInfo);
             liveMap.update(id, {
-                AESKey: basicInfo,
+                AESKey: basicInfo.AESKey,
+                roomsInfo,
             });
-
+            // console.log(liveMap);
             // encrypt.decrypt
             ctx.body = "ok";
             ctx.status = 200;

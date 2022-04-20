@@ -20,24 +20,32 @@
             :value="files"
             ref="uspload"
         >
-            <el-button type="primary">
-                <i class="el-icon-upload"></i> Upload</el-button
-            >
+            <el-button type="primary"> <i class="el-icon-upload"></i> Upload</el-button>
         </file-upload>
         <div>
             <el-table :data="files" style="width: 100%">
-                <el-table-column prop="name" label="Name" width="180">
-                    <!-- <template v-slot="{ row: { name, size } }">
-                        <div>
-                            <el-table-column prop="name" label="Name" width="180">
-                            </el-table-column>
-                            <el-table-column prop="address" label="Address"> </el-table-column>
-                        </div>
-                    </template> -->
-                </el-table-column>
-                <el-table-column prop="name" label="Name" width="180">
+                <el-table-column prop="name" label="Name" width="280"> </el-table-column>
+                <el-table-column prop="size" label="Size" width="180">
                     <template v-slot="{ row: { size } }">
                         <span>{{ filesize(size) }}</span>
+                    </template>
+                </el-table-column>
+            </el-table>
+            <el-table :data="othersTable" style="width: 100%">
+                <el-table-column prop="name" label="Name" width="280"> </el-table-column>
+                <el-table-column prop="size" label="Size" width="180">
+                    <template v-slot="{ row: { size } }">
+                        <span>{{ filesize(size) }}</span>
+                    </template>
+                </el-table-column>
+                <el-table-column prop="id" label="From" width="180">
+                    <template v-slot="{ row: { id } }">
+                        <span :title="id">{{ id.slice(0, 10) }}</span>
+                    </template>
+                </el-table-column>
+                <el-table-column label="Action" width="180">
+                    <template v-slot="{ row: { name, id } }">
+                        <el-button type="primary" @click="download(name, id)">Download</el-button>
                     </template>
                 </el-table-column>
             </el-table>
@@ -56,20 +64,53 @@
 import filesize from "filesize";
 import Vue from "vue";
 import FileUpload from "vue-upload-component";
+import { hash } from "../common/crypto";
+import config from "../config";
 
 export default Vue.extend({
     name: "RoomComp",
     props: {
-        room: Object
+        room: Object,
+        othersInfo: Array
+    },
+    computed: {
+        roomHash() {
+            return hash(this.room.roomPassword, config.roomSalt);
+        },
+        othersTable() {
+            if (!this.othersInfo) {
+                return [];
+            }
+            console.log("verify", this.roomHash);
+            return this.othersInfo
+                .filter(other => {
+                    return other.hash === this.roomHash;
+                })
+                .reduce((p, v) => {
+                    if (v.room.files) {
+                        v.room.files.forEach(file => {
+                            p.push(
+                                Object.assign({}, file, {
+                                    id: v.id
+                                })
+                            );
+                        });
+                    }
+
+                    return p;
+                }, []);
+        }
     },
     methods: {
+        download(fileName, from) {},
+        setFiles(files) {
+            this.files = files;
+        },
         onFiles(files) {
-            console.log(files);
             this.$emit("filesChange", files);
             this.files = files;
         },
         showPassword() {
-            console.log("show");
             this.showPasswordDialogVisible = true;
         },
         copyPassword() {
