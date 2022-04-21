@@ -18,7 +18,8 @@
         "jsencrypt": "^3.2.1",
         "vue": "^2.6.14",
         "vue-router": "^3.5.1",
-        "vue-upload-component": "^2.8.22"
+        "vue-upload-component": "^2.8.22",
+        "vuex": "3.0"
     },
     "devDependencies": {
         "@typescript-eslint/eslint-plugin": "^5.4.0",

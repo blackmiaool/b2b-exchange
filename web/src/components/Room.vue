@@ -1,5 +1,5 @@
 <template>
-    <div class="room" style="height: 100%; padding: 20px">
+    <div class="room" style="height: 100%; padding: 20px; box-sizing: border-box">
         <div style="position: relative">
             <span v-if="room" style="font-size: 30px; font-weight: bold">{{ room.roomName }}</span>
             <el-button
@@ -20,7 +20,7 @@
             :value="files"
             ref="uspload"
         >
-            <el-button type="primary"> <i class="el-icon-upload"></i> Upload</el-button>
+            <el-button type="primary"><i class="el-icon-upload"></i> Upload</el-button>
         </file-upload>
         <div>
             <el-table :data="files" style="width: 100%">
@@ -45,7 +45,9 @@
                 </el-table-column>
                 <el-table-column label="Action" width="180">
                     <template v-slot="{ row: { name, id } }">
-                        <el-button type="primary" @click="download(name, id)">Download</el-button>
+                        <el-button type="primary" @click="startDownload(name, id, size)"
+                            ><i class="el-icon-download"></i> Download</el-button
+                        >
                     </template>
                 </el-table-column>
             </el-table>
@@ -66,6 +68,7 @@ import Vue from "vue";
 import FileUpload from "vue-upload-component";
 import { decrypt, hash } from "../common/crypto";
 import config from "../config";
+import { mapActions } from "vuex";
 
 export default Vue.extend({
     name: "RoomComp",
@@ -73,6 +76,7 @@ export default Vue.extend({
         room: Object,
         othersInfo: Array
     },
+    mounted() {},
     computed: {
         roomHash() {
             if (!this.room) {
@@ -105,7 +109,16 @@ export default Vue.extend({
         }
     },
     methods: {
-        download(fileName, from) {},
+        ...mapActions(["safeRequest", "download"]),
+        startDownload(fileName, from, fileSize) {
+            this.download({
+                roomHash: this.roomHash,
+                roomPassword: this.room.roomPassword,
+                fileName,
+                fileSize,
+                from
+            });
+        },
         setFiles(files) {
             this.files = files;
         },

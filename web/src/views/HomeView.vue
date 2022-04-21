@@ -23,8 +23,8 @@ import Room from "../components/Room.vue";
 import config from "../config";
 import JSEncrypt from "jsencrypt";
 import { request } from "../common/io";
-import { decrypt, encrypt, hash } from "../common/crypto";
-
+import { encrypt, hash } from "../common/crypto";
+import { mapActions } from "vuex";
 export default {
     name: "HomeView",
     data() {
@@ -44,13 +44,20 @@ export default {
         encrypt.setPublicKey(config.pubicKey);
         this.encrypt = encrypt;
         this.AESKey = this.generateAESKey();
-
+        this.$store.commit("setAESKey", this.AESKey);
         this.id = hash(this.AESKey, config.aesSalt);
+        this.$store.commit("setID", this.id);
         this.encryptedBasic = this.encrypt.encrypt(
             JSON.stringify({
                 AESKey: this.AESKey
             })
         );
+        window.onbeforeunload = () => {
+            this.safeRequest({
+                method: "exit",
+                data: {}
+            });
+        };
     },
     mounted() {
         this.ping();
@@ -73,18 +80,9 @@ export default {
         this.intervalList = [];
     },
     methods: {
+        ...mapActions(["safeRequest"]),
         generateAESKey() {
             return String(Math.random()) + String(Date.now());
-        },
-        async safeRequest({ method, data }) {
-            const result = await request({
-                method,
-                data: {
-                    id: this.id,
-                    d: encrypt(JSON.stringify(data), this.AESKey)
-                }
-            });
-            return decrypt(result, this.AESKey);
         },
         async getRoomInfo() {
             const result = await this.safeRequest({
@@ -94,11 +92,16 @@ export default {
             this.othersInfo = JSON.parse(result);
         },
         ping() {
+            const encryptedRoomsInfo = {};
+            for (const roomHash in this.roomsInfo) {
+                encryptedRoomsInfo[roomHash] = {};
+                encryptedRoomsInfo[roomHash].files = this.roomsInfo[roomHash].encryptedFiles;
+            }
             request({
                 method: "ping",
                 data: {
                     e: this.encryptedBasic,
-                    i: encrypt(JSON.stringify(this.roomsInfo), this.AESKey)
+                    i: encrypt(JSON.stringify(encryptedRoomsInfo), this.AESKey)
                 }
             });
         },
@@ -119,7 +122,12 @@ export default {
                 };
             });
             const roomHash = hash(room.roomPassword, config.roomSalt);
-            this.roomsInfo[roomHash].files = encrypt(JSON.stringify(filesInfo), room.roomPassword);
+            this.roomsInfo[roomHash].files = files;
+            // this.roomsInfo[roomHash].filesInfo = filesInfo; // filesInfo), room.roomPassword);
+            this.roomsInfo[roomHash].encryptedFiles = encrypt(
+                JSON.stringify(filesInfo),
+                room.roomPassword
+            );
             this.ping();
         },
         onSelect(room) {

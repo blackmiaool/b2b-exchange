@@ -58,30 +58,54 @@ const liveMap = new LiveMap<{
         files: { size: number; name: string };
     };
 }>({
-    timeout: 3e4,
+    timeout: 62e3,
 });
 
 router.post("/(.*)", async (ctx) => {
     const method = ctx.request.url.replace(/^\//, "");
     const data = ctx.request.body.data;
-    // console.log(ctx.request.body);
     const allInfo = liveMap.getAll();
     let AESKey;
     let request;
     let requestId;
 
-    if (data.id && data.d) {
+    if (data.id) {
+        if (!data.d) {
+            console.log("id without d", data.id, data.d);
+            return;
+        }
         const info = allInfo.get(data.id);
         if (!info) {
+            console.log("can't find id", data.id);
             return;
         }
         AESKey = info.data.AESKey;
-        console.log(data, AESKey);
-        request = JSON.parse(decrypt(data.d, AESKey));
+        try {
+            request = JSON.parse(decrypt(data.d, AESKey));
+        } catch (e) {
+            console.log("can't decrypt d", e.message);
+            return;
+        }
+
         requestId = data.id;
     }
-    // console.log(allInfo.get("35cd9416345f3af")?.data);
+    function getSafeBody(body: Record<string, any> | any[]) {
+        return encrypt(JSON.stringify(body), AESKey);
+    }
     switch (method) {
+        case "exit": {
+            liveMap.delete(requestId);
+            console.log("exit", requestId);
+            break;
+        }
+        case "download": {
+            console.log(request);
+            ctx.body = getSafeBody({
+                code: 0,
+            });
+            ctx.status = 200;
+            break;
+        }
         case "getRoomInfo": {
             const ret = [];
             for (const [id, { data }] of allInfo) {
@@ -98,7 +122,7 @@ router.post("/(.*)", async (ctx) => {
                     }
                 }
             }
-            ctx.body = encrypt(JSON.stringify(ret), AESKey);
+            ctx.body = getSafeBody(ret);
             ctx.status = 200;
             break;
         }
@@ -111,18 +135,14 @@ router.post("/(.*)", async (ctx) => {
             } catch (e) {
                 ctx.body = "can't decode";
                 ctx.status = 401;
+                console.log("can't decode", e.message);
                 return;
             }
             const roomsInfo = JSON.parse(decrypt(data.i, basicInfo.AESKey));
-            // console.log(result);
-            // console.log("basicInfo", basicInfo, id);
-            // console.log(roomsInfo);
             liveMap.update(id, {
                 AESKey: basicInfo.AESKey,
                 roomsInfo,
             });
-            // console.log(liveMap);
-            // encrypt.decrypt
             ctx.body = "ok";
             ctx.status = 200;
             break;
