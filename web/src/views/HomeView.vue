@@ -33,8 +33,9 @@ export default {
             intervalList: [],
             id: "HomeView",
             room: null,
-            othersInfo: []
-            // AESKey: null
+            othersInfo: [],
+
+            AESKey: "" // between client and server
         };
     },
     created() {
@@ -42,7 +43,8 @@ export default {
         const encrypt = new JSEncrypt();
         encrypt.setPublicKey(config.pubicKey);
         this.encrypt = encrypt;
-        this.AESKey = String(Math.random()) + String(Date.now());
+        this.AESKey = this.generateAESKey();
+
         this.id = hash(this.AESKey, config.aesSalt);
         this.encryptedBasic = this.encrypt.encrypt(
             JSON.stringify({
@@ -71,6 +73,9 @@ export default {
         this.intervalList = [];
     },
     methods: {
+        generateAESKey() {
+            return String(Math.random()) + String(Date.now());
+        },
         async safeRequest({ method, data }) {
             const result = await request({
                 method,
@@ -87,7 +92,6 @@ export default {
                 data: { roomHash: hash(this.room.roomPassword, config.roomSalt) }
             });
             this.othersInfo = JSON.parse(result);
-            console.log("this.othersInfo ", this.othersInfo);
         },
         ping() {
             request({
@@ -99,7 +103,6 @@ export default {
             });
         },
         onRoomList(roomList) {
-            console.log("on room list", roomList);
             roomList?.forEach(room => {
                 const roomHash = hash(room.roomPassword, config.roomSalt);
                 if (!this.roomsInfo[roomHash]) {
@@ -115,16 +118,11 @@ export default {
                     name: file.name
                 };
             });
-            console.log(room.roomPassword);
             const roomHash = hash(room.roomPassword, config.roomSalt);
-            this.roomsInfo[roomHash].files = filesInfo;
-
-            console.log("onFilesChange", files, room);
+            this.roomsInfo[roomHash].files = encrypt(JSON.stringify(filesInfo), room.roomPassword);
             this.ping();
-            console.log("this.roomsInfo", this.roomsInfo);
         },
         onSelect(room) {
-            console.log("on select", room);
             this.room = room;
             const roomHash = hash(room.roomPassword, config.roomSalt);
             this.$refs.room.setFiles(this.roomsInfo[roomHash].files);

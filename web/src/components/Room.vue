@@ -64,7 +64,7 @@
 import filesize from "filesize";
 import Vue from "vue";
 import FileUpload from "vue-upload-component";
-import { hash } from "../common/crypto";
+import { decrypt, hash } from "../common/crypto";
 import config from "../config";
 
 export default Vue.extend({
@@ -75,20 +75,23 @@ export default Vue.extend({
     },
     computed: {
         roomHash() {
+            if (!this.room) {
+                return "";
+            }
             return hash(this.room.roomPassword, config.roomSalt);
         },
         othersTable() {
             if (!this.othersInfo) {
                 return [];
             }
-            console.log("verify", this.roomHash);
             return this.othersInfo
                 .filter(other => {
                     return other.hash === this.roomHash;
                 })
                 .reduce((p, v) => {
                     if (v.room.files) {
-                        v.room.files.forEach(file => {
+                        const files = JSON.parse(decrypt(v.room.files, this.room.roomPassword));
+                        files.forEach(file => {
                             p.push(
                                 Object.assign({}, file, {
                                     id: v.id

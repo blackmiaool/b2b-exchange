@@ -65,7 +65,6 @@ export default {
     },
     methods: {
         onSelect(index) {
-            console.log("on", this.roomList, index);
             this.selected = this.roomList[index];
             this.$emit("select", this.selected);
         },
