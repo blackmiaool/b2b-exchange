@@ -1,10 +1,16 @@
-import convert from "koa-convert";
-import json from "koa-json";
 import config from "./config";
 import koaBody from "koa-body";
 import Koa from "koa";
 
 const app = new Koa();
+app.use(
+    koaBody({
+        formidable: {},
+        multipart: true,
+        formLimit: "10mb",
+        jsonLimit: "10mb",
+    })
+);
 declare global {
     interface Date {
         UTCformat(format: string): string;
@@ -42,8 +48,6 @@ Date.prototype.format = function (format) {
     }
     return format;
 };
-app.use(convert(koaBody()));
-app.use(convert(json()));
 if (config.local) {
     app.use((ctx, next) => {
         //local only

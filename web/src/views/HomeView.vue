@@ -85,11 +85,62 @@ export default {
             return String(Math.random()) + String(Date.now());
         },
         async getRoomInfo() {
-            const result = await this.safeRequest({
+            let result = await this.safeRequest({
                 method: "getRoomInfo",
                 data: { roomHash: hash(this.room.roomPassword, config.roomSalt) }
             });
-            this.othersInfo = JSON.parse(result);
+            result = JSON.parse(result);
+            if (result.waitChunkMap) {
+                for (const roomHash in result.waitChunkMap) {
+                    if (!this.roomsInfo[roomHash]) {
+                        continue;
+                    }
+                    for (const fileHash in result.waitChunkMap[roomHash]) {
+                        this.roomsInfo[roomHash].files.some(fileInfo => {
+                            if (hash(fileInfo.name, config.fileSalt) === fileHash) {
+                                // console.log(
+                                //     "found",
+                                //     result.waitChunkMap[roomHash][fileHash][0],
+                                //     fileInfo
+                                // );
+                                const requestInfo = result.waitChunkMap[roomHash][fileHash];
+                                const form: any = new FormData();
+                                form.append("my_field", "my value");
+                                form.append(
+                                    "my_buffer",
+                                    fileInfo.file.slice(
+                                        requestInfo[0].position,
+                                        requestInfo[0].position + requestInfo[0].size
+                                    )
+                                );
+
+                                request({
+                                    method: "push",
+                                    headers: {
+                                        "Content-Type": "multipart/form-data",
+                                        ri: JSON.stringify({
+                                            id: this.id,
+                                            d: encrypt(
+                                                JSON.stringify({
+                                                    position: requestInfo[0].position,
+                                                    size: requestInfo[0].size,
+                                                    roomHash,
+                                                    fileHash
+                                                }),
+                                                this.AESKey
+                                            )
+                                        })
+                                    },
+                                    data: form
+                                });
+                                return true;
+                            }
+                            return false;
+                        });
+                    }
+                }
+            }
+            this.othersInfo = result.others;
         },
         ping() {
             const encryptedRoomsInfo = {};

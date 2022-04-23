@@ -44,7 +44,7 @@
                     </template>
                 </el-table-column>
                 <el-table-column label="Action" width="180">
-                    <template v-slot="{ row: { name, id } }">
+                    <template v-slot="{ row: { name, id, size } }">
                         <el-button type="primary" @click="startDownload(name, id, size)"
                             ><i class="el-icon-download"></i> Download</el-button
                         >
