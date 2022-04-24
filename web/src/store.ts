@@ -1,6 +1,6 @@
 import Vue from "vue";
 import Vuex from "vuex";
-import { decrypt, encrypt, hash } from "./common/crypto";
+import { decrypt, decryptBlobToBlob, encrypt, hash } from "./common/crypto";
 import { request } from "./common/io";
 import parallelTask from "./common/parallelTask";
 import config from "./config";
@@ -81,7 +81,8 @@ const store = new Vuex.Store({
                             )
                         }
                     });
-                    buffers[index] = result;
+                    buffers[index] = await decryptBlobToBlob(result, roomPassword);
+                    // buffers[index] = decrypt(await result.arrayBuffer(), roomPassword, true);
                 },
                 index => {
                     return index >= chunkCount;

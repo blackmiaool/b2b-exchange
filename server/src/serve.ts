@@ -102,8 +102,7 @@ router.post("/(.*)", async (ctx) => {
                 request.fileHash
             ].filter(({ resolve, position, size }) => {
                 if (position === request.position && size === request.size) {
-                    console.log(ctx.request.files.my_buffer.toJSON());
-                    resolve(fs.readFileSync(ctx.request.files.my_buffer.path));
+                    resolve(fs.readFileSync(ctx.request.files.blob.path));
                     return false;
                 }
                 return true;

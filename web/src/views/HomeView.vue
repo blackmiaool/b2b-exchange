@@ -23,8 +23,10 @@ import Room from "../components/Room.vue";
 import config from "../config";
 import JSEncrypt from "jsencrypt";
 import { request } from "../common/io";
-import { encrypt, hash } from "../common/crypto";
+import { decrypt, encrypt, encryptBlobToBlob, hash } from "../common/crypto";
 import { mapActions } from "vuex";
+import CryptoJS from "crypto-js";
+
 export default {
     name: "HomeView",
     data() {
@@ -96,24 +98,35 @@ export default {
                         continue;
                     }
                     for (const fileHash in result.waitChunkMap[roomHash]) {
-                        this.roomsInfo[roomHash].files.some(fileInfo => {
+                        this.roomsInfo[roomHash].files.some(async fileInfo => {
                             if (hash(fileInfo.name, config.fileSalt) === fileHash) {
-                                // console.log(
-                                //     "found",
-                                //     result.waitChunkMap[roomHash][fileHash][0],
-                                //     fileInfo
-                                // );
                                 const requestInfo = result.waitChunkMap[roomHash][fileHash];
+                                const roomPassword = this.roomsInfo[roomHash].roomPassword;
                                 const form: any = new FormData();
-                                form.append("my_field", "my value");
-                                form.append(
-                                    "my_buffer",
-                                    fileInfo.file.slice(
-                                        requestInfo[0].position,
-                                        requestInfo[0].position + requestInfo[0].size
-                                    )
+                                const blob = fileInfo.file.slice(
+                                    requestInfo[0].position,
+                                    requestInfo[0].position + requestInfo[0].size
                                 );
+                                const encryptedBlob = await encryptBlobToBlob(blob, roomPassword);
+                                // const encrypted = encrypt(
+                                //     await fileInfo.file
+                                //         .slice(
+                                //             requestInfo[0].position,
+                                //             requestInfo[0].position + requestInfo[0].size
+                                //         )
+                                //         .arrayBuffer(),
+                                //     this.roomsInfo[roomHash].roomPassword,
+                                //     true
+                                // );
+                                // const a = CryptoJS.lib.WordArray.create(encrypted);
+                                // const encryptedBlob = new Blob([encrypted]);
+                                // console.log("encrypted", encrypted);
+                                // console.log("encryptedBlob", encryptedBlob);
+                                // console.log(await encryptedBlob.arrayBuffer());
 
+                                // const decryptedBlob = new Blob([decrypted]);
+                                console.log("encryptedBlob", encryptedBlob);
+                                form.append("blob", encryptedBlob);
                                 request({
                                     method: "push",
                                     headers: {
@@ -174,6 +187,7 @@ export default {
             });
             const roomHash = hash(room.roomPassword, config.roomSalt);
             this.roomsInfo[roomHash].files = files;
+            this.roomsInfo[roomHash].roomPassword = room.roomPassword;
             // this.roomsInfo[roomHash].filesInfo = filesInfo; // filesInfo), room.roomPassword);
             this.roomsInfo[roomHash].encryptedFiles = encrypt(
                 JSON.stringify(filesInfo),
