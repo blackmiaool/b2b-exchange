@@ -15,8 +15,7 @@ export default class LiveMap<T> {
         return this.all;
     }
     delete(id: string) {
-        // console.log("delete", id, new Date().format("hh:mm:ss"));
-        this.all.delete(id);
+        this.all.delete(id);      
     }
     update(id: string, data: T) {
         // console.log("update", id, new Date().format("hh:mm:ss"));

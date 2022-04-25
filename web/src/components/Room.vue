@@ -1,5 +1,5 @@
 <template>
-    <div class="room" style="height: 100%; padding: 20px; box-sizing: border-box">
+    <div class="room" style="height: 100%; padding: 20px; box-sizing: border-box; overflow: auto">
         <div style="position: relative">
             <span v-if="room" style="font-size: 30px; font-weight: bold" :title="roomHash">{{
                 room.roomName
@@ -50,10 +50,18 @@
                     </template>
                 </el-table-column>
                 <el-table-column label="Action" width="180">
-                    <template v-slot="{ row: { name, id, size } }">
-                        <el-button type="primary" @click="startDownload(name, id, size)"
-                            ><i class="el-icon-download"></i> Download</el-button
-                        >
+                    <template v-slot="{ row: file }">
+                        <div>
+                            <el-button
+                                v-if="!progressMap[file.name]"
+                                type="primary"
+                                @click="startDownload(file)"
+                                ><i class="el-icon-download"></i> Download</el-button
+                            >
+                            <el-button v-if="progressMap[file.name]">{{
+                                progressMap[file.name] | percentage
+                            }}</el-button>
+                        </div>
                     </template>
                 </el-table-column>
             </el-table>
@@ -82,6 +90,9 @@ export default Vue.extend({
         room: Object,
         othersInfo: Array
     },
+    data() {
+        return { othersTable: [], files: [], showPasswordDialogVisible: false, progressMap: {} };
+    },
     mounted() {},
     computed: {
         roomHash() {
@@ -89,52 +100,47 @@ export default Vue.extend({
                 return "";
             }
             return hash(this.room.roomPassword, config.roomSalt);
-        },
-        othersTable() {
-            if (!this.othersInfo) {
-                return [];
-            }
-            return this.othersInfo
-                .filter(other => {
-                    return other.hash === this.roomHash;
-                })
-                .reduce((p, v) => {
-                    if (v.room.files) {
-                        const files = JSON.parse(decrypt(v.room.files, this.room.roomPassword));
-                        files.forEach(file => {
-                            p.push(
-                                Object.assign({}, file, {
-                                    id: v.id
-                                })
-                            );
-                        });
-                    }
-
-                    return p;
-                }, []);
         }
     },
     methods: {
         ...mapActions(["safeRequest", "download"]),
-        startDownload(fileName, from, fileSize) {
-            this.download({
+        async startDownload(file) {
+            console.log("start download", file);
+            this.$set(this.progressMap, file.name, 0.000001);
+            await this.download({
                 roomHash: this.roomHash,
                 roomPassword: this.room.roomPassword,
-                fileName,
-                fileSize,
-                from
+                fileName: file.name,
+                fileSize: file.size,
+                from: file.id,
+                onProgress: progress => {
+                    this.$set(this.progressMap, file.name, progress);
+                    console.log("on", progress);
+                }
             });
+            this.$delete(this.progressMap, file.name);
         },
         setFiles(files) {
             this.files = files;
         },
         onFiles(files) {
-            this.files = files.map(file => {
-                if (!file.hash) {
-                    file.hash = hash(file.name, config.fileSalt);
-                }
-                return file;
-            });
+            const nameMap = {};
+            this.files = files
+                .map(file => {
+                    if (!file.hash) {
+                        file.hash = hash(file.name, config.fileSalt);
+                    }
+                    return file;
+                })
+                .filter(({ name }) => {
+                    if (nameMap[name]) {
+                        this.$message.error("found duplicated file name " + name);
+
+                        return false;
+                    }
+                    nameMap[name] = true;
+                    return true;
+                });
             this.$emit("filesChange", this.files);
         },
         showPassword() {
@@ -146,13 +152,35 @@ export default Vue.extend({
         },
         filesize
     },
-    data() {
-        return {
-            files: [],
-            showPasswordDialogVisible: false
-        };
-    },
     watch: {
+        othersInfo: {
+            immediate: true,
+            handler(othersInfo) {
+                if (!othersInfo) {
+                    this.othersTable = [];
+                }
+                this.othersTable = othersInfo.reduce((p, v) => {
+                    if (v.room.files) {
+                        const files = JSON.parse(decrypt(v.room.files, this.room.roomPassword));
+                        files.forEach(file => {
+                            p.push(
+                                Object.assign(
+                                    {
+                                        progress: 0
+                                    },
+                                    file,
+                                    {
+                                        id: v.id
+                                    }
+                                )
+                            );
+                        });
+                    }
+
+                    return p;
+                }, []);
+            }
+        }
         // files(files) {
         //     console.log(files);
         // }

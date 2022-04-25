@@ -51,33 +51,32 @@ router.post("/(.*)", async (ctx) => {
     const allInfo = liveMap.getAll();
     let AESKey;
     let request;
-    let requestId;
-    if (data.id) {
-        requestId = data.id;
-    }
+    const requestId = data.id;
 
     if (requestId) {
-        if (data.id && !data.d) {
+        if (!data.d) {
             console.log("id without d", requestId, data.d);
+            ctx.status = 400;
             return;
         }
         const info = allInfo.get(requestId);
         if (!info) {
-            console.log("can't find id", requestId);
+            ctx.status = 401;
             return;
         }
         AESKey = info.data.AESKey;
-        if (data.id) {
+        if (requestId) {
             try {
                 request = JSON.parse(decrypt(data.d, AESKey));
             } catch (e) {
                 console.log("can't decrypt d", e.message);
+                ctx.status = 401;
                 return;
             }
         }
     }
 
-    function getSafeBody(body: Record<string, any> | any[]) {
+    function generateSafeBody(body: Record<string, any> | any[]) {
         return encrypt(JSON.stringify(body), AESKey);
     }
     // function getWaitChunkMap() {
@@ -95,6 +94,10 @@ router.post("/(.*)", async (ctx) => {
     // }
     switch (method) {
         case "push": {
+            if (!requestId) {
+                ctx.status = 400;
+                return;
+            }
             const roomChunkRequest =
                 waitChunkMap?.[requestId]?.[request.roomHash];
             if (!roomChunkRequest?.[request.fileHash]) {
@@ -129,11 +132,15 @@ router.post("/(.*)", async (ctx) => {
             if (waitChunkMap[requestId]) {
                 ret.waitChunkMap = waitChunkMap[requestId];
             }
-            ctx.body = getSafeBody(ret);
+            ctx.body = generateSafeBody(ret);
             ctx.status = 200;
             break;
         }
         case "chunk": {
+            if (!requestId) {
+                ctx.status = 400;
+                return;
+            }
             // console.log("chunk", request);
             const chunk = await new Promise((resolve) => {
                 if (!waitChunkMap[request.id]) {
@@ -182,30 +189,45 @@ router.post("/(.*)", async (ctx) => {
             break;
         }
         case "exit": {
+            if (!requestId) {
+                ctx.status = 400;
+                return;
+            }
             liveMap.delete(requestId);
-            console.log("exit", requestId);
+            ctx.status = 200;
             break;
         }
         case "download": {
-            // console.log(request);
-            ctx.body = getSafeBody({
+            if (!requestId) {
+                ctx.status = 400;
+                return;
+            }
+            console.log(request);
+            ctx.body = generateSafeBody({
                 code: 0,
             });
             ctx.status = 200;
             break;
         }
         case "getRoomInfo": {
+            if (!requestId) {
+                ctx.status = 400;
+                return;
+            }
             const ret: any = {};
             const others = [];
             for (const [id, { data }] of allInfo) {
                 if (id === requestId) {
                     continue;
                 }
-                for (const hash in data.roomsInfo) {
-                    if (hash === request.roomHash) {
+                for (const roomHash in data.roomsInfo) {
+                    if (
+                        roomHash === request.roomHash &&
+                        Object.keys(data.roomsInfo[roomHash]).length
+                    ) {
                         others.push({
-                            hash,
-                            room: data.roomsInfo[hash],
+                            roomHash,
+                            room: data.roomsInfo[roomHash],
                             id,
                         });
                     }
@@ -215,7 +237,7 @@ router.post("/(.*)", async (ctx) => {
             if (waitChunkMap[requestId]) {
                 ret.waitChunkMap = waitChunkMap[requestId];
             }
-            ctx.body = getSafeBody(ret);
+            ctx.body = generateSafeBody(ret);
             ctx.status = 200;
             break;
         }

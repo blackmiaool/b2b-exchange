@@ -45,6 +45,8 @@
 </template>
 
 <script lang="ts">
+import { hash } from "../common/crypto";
+import config from "../config";
 export default {
     name: "RoomList",
     data() {
@@ -66,7 +68,8 @@ export default {
     methods: {
         onSelect(index) {
             this.selected = this.roomList[index];
-            this.$emit("select", this.selected);
+            const roomHash = hash(this.selected.roomPassword, config.roomSalt);
+            this.$emit("select", { ...this.selected, hash: roomHash });
         },
         onConfirmAddRoom() {
             if (!this.roomName || !this.roomPassword) {

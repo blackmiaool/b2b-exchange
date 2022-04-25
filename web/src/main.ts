@@ -10,6 +10,13 @@ Vue.use(ElementUI);
 
 Vue.config.productionTip = false;
 
+Vue.filter("percentage", function (value) {
+    if (!value) {
+        value = 0;
+    }
+    return Math.floor(value * 100) + "%";
+});
+
 new Vue({
     router,
     store,

@@ -56,11 +56,16 @@ export default {
             })
         );
         window.onbeforeunload = () => {
-            this.safeRequest({
-                method: "exit",
-                data: {}
-            });
+            this.exit();
         };
+    },
+    destroyed() {
+        console.log(1);
+        this.exit();
+        this.intervalList.forEach(interval => {
+            clearInterval(interval);
+        });
+        this.intervalList = [];
     },
     mounted() {
         this.ping();
@@ -76,15 +81,18 @@ export default {
         this.intervalList.push(interval);
         this.intervalList.push(interval2);
     },
-    destroyed() {
-        this.intervalList.forEach(interval => {
-            clearInterval(interval);
-        });
-        this.intervalList = [];
-    },
     methods: {
         ...mapMutations(["getAESKey"]),
         ...mapActions(["safeRequest"]),
+        exit() {
+            request({
+                method: "exit",
+                data: {
+                    id: this.id,
+                    d: encrypt(JSON.stringify({}), this.AESKey)
+                }
+            });
+        },
         generateAESKey() {
             return String(Math.random()) + String(Date.now());
         },
@@ -174,10 +182,9 @@ export default {
         async getRoomInfo() {
             let result = await this.safeRequest({
                 method: "getRoomInfo",
-                data: { roomHash: hash(this.room.roomPassword, config.roomSalt) }
+                data: { roomHash: this.room.hash }
             });
             result = JSON.parse(result);
-
             if (result.waitChunkMap) {
                 this.onWaitChunkMap(result.waitChunkMap);
             }
@@ -213,11 +220,9 @@ export default {
                     name: file.name
                 };
             });
-            const roomHash = hash(room.roomPassword, config.roomSalt);
-            this.roomsInfo[roomHash].files = files;
-            this.roomsInfo[roomHash].roomPassword = room.roomPassword;
-            // this.roomsInfo[roomHash].filesInfo = filesInfo; // filesInfo), room.roomPassword);
-            this.roomsInfo[roomHash].encryptedFiles = encrypt(
+            this.roomsInfo[room.hash].files = files;
+            this.roomsInfo[room.hash].roomPassword = room.roomPassword;
+            this.roomsInfo[room.hash].encryptedFiles = encrypt(
                 JSON.stringify(filesInfo),
                 room.roomPassword
             );
@@ -225,9 +230,8 @@ export default {
         },
         onSelect(room) {
             this.room = room;
-            const roomHash = hash(room.roomPassword, config.roomSalt);
-            this.$refs.room.setFiles(this.roomsInfo[roomHash].files);
-
+            this.$refs.room.setFiles(this.roomsInfo[room.hash].files);
+            this.othersInfo = [];
             this.getRoomInfo();
         }
     },

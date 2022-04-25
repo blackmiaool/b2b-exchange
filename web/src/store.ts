@@ -43,7 +43,10 @@ const store = new Vuex.Store({
             });
             return decrypt(result, state.AESKey);
         },
-        async download({ dispatch, state }, { roomHash, roomPassword, fileName, fileSize, from }) {
+        async download(
+            { state },
+            { roomHash, roomPassword, fileName, fileSize, from, onProgress }
+        ) {
             const result = await request({
                 method: "download",
                 data: {
@@ -67,6 +70,8 @@ const store = new Vuex.Store({
             const chunkCount = Math.floor(fileSize / chunkSize) + (lastChunk ? 1 : 0);
             console.log(fileSize, chunkCount, lastChunk);
             const buffers = [];
+            onProgress(0);
+            let received = 0;
             await parallelTask(
                 async index => {
                     const result = await request({
@@ -90,6 +95,8 @@ const store = new Vuex.Store({
                         }
                     });
                     buffers[index] = await decryptBlobToBlob(result, roomPassword);
+                    received++;
+                    onProgress(received / chunkCount);
                     // buffers[index] = decrypt(await result.arrayBuffer(), roomPassword, true);
                 },
                 index => {
