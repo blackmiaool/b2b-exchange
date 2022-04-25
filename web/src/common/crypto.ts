@@ -1,23 +1,12 @@
 import CryptoJS from "crypto-js";
 
 const hashCache = {};
-export function encrypt(message, secret, blob?: boolean) {
-    if (blob) {
-        const wordArray = CryptoJS.lib.WordArray.create(message);
-        // console.log(wordArray, secret);
-        const result = CryptoJS.AES.encrypt(wordArray, secret);
-        return result;
-    } else {
-        const result = CryptoJS.AES.encrypt(message, secret);
-        return result.toString();
-    }
+export function encrypt(message, secret) {
+    const result = CryptoJS.AES.encrypt(message, secret);
+    return result.toString();
 }
-export function decrypt(message, secret, blob?: boolean) {
-    if (blob) {
-        return CryptoJS.AES.decrypt(message, secret);
-    } else {
-        return CryptoJS.AES.decrypt(message, secret).toString(CryptoJS.enc.Utf8);
-    }
+export function decrypt(message, secret) {
+    return CryptoJS.AES.decrypt(message, secret).toString(CryptoJS.enc.Utf8);
 }
 export function hash(message, salt) {
     if (!hashCache[message]) {

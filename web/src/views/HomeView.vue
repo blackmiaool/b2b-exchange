@@ -24,14 +24,15 @@ import config from "../config";
 import JSEncrypt from "jsencrypt";
 import { request } from "../common/io";
 import { decrypt, encrypt, encryptBlobToBlob, hash } from "../common/crypto";
-import { mapActions } from "vuex";
-import CryptoJS from "crypto-js";
+import { mapActions, mapMutations } from "vuex";
+import { AnyMap } from "../common/types";
 
 export default {
     name: "HomeView",
     data() {
         // const id = Math.floor(Math.random() * 1e5);
         return {
+            processingChunk: false,
             intervalList: [],
             id: "HomeView",
             room: null,
@@ -82,9 +83,93 @@ export default {
         this.intervalList = [];
     },
     methods: {
+        ...mapMutations(["getAESKey"]),
         ...mapActions(["safeRequest"]),
         generateAESKey() {
             return String(Math.random()) + String(Date.now());
+        },
+        async onWaitChunkMap(waitChunkMap) {
+            if (this.processingChunk) {
+                return;
+            }
+            this.processingChunk = true;
+            try {
+                let fileInfo;
+                let path = { roomHash: "", fileHash: "" };
+                for (const roomHash in waitChunkMap) {
+                    if (!this.roomsInfo[roomHash]) {
+                        continue;
+                    }
+                    for (const fileHash in waitChunkMap[roomHash]) {
+                        fileInfo = this.roomsInfo[roomHash].files.find(fileInfo => {
+                            return fileInfo.hash === fileHash;
+                        });
+                        if (fileInfo) {
+                            path = {
+                                roomHash,
+                                fileHash
+                            };
+                            break;
+                        }
+                    }
+                    break;
+                }
+                if (fileInfo) {
+                    const requestInfo = waitChunkMap[path.roomHash][path.fileHash];
+                    const ret = await this.pushChunk({
+                        position: requestInfo[0].position,
+                        size: requestInfo[0].size,
+                        file: fileInfo.file,
+                        roomHash: path.roomHash,
+                        fileHash: path.fileHash
+                    });
+                    if (ret.waitChunkMap) {
+                        setTimeout(() => {
+                            this.onWaitChunkMap(ret.waitChunkMap);
+                        });
+                    }
+                }
+            } finally {
+                this.processingChunk = false;
+            }
+        },
+        async pushChunk({ position, size, file, roomHash, fileHash }) {
+            const roomPassword = this.roomsInfo[roomHash].roomPassword;
+            const form: any = new FormData();
+            const blob = file.slice(position, position + size);
+            const encryptedBlob = await encryptBlobToBlob(blob, roomPassword);
+            console.log("encryptedBlob", encryptedBlob);
+            form.append("blob", encryptedBlob);
+            form.append("id", this.id);
+            form.append(
+                "d",
+                encrypt(
+                    JSON.stringify({
+                        position,
+                        size,
+                        roomHash,
+                        fileHash
+                    }),
+                    this.AESKey
+                )
+            );
+            const result = await request({
+                method: "push",
+                headers: {
+                    "Content-Type": "multipart/form-data"
+                },
+                data: form
+            });
+
+            const ret = this.decryptRet(result);
+            return ret;
+            // console.log("ret", ret);
+        },
+        decryptRet(result: string): AnyMap {
+            if (result === "OK") {
+                return {};
+            }
+            return JSON.parse(decrypt(result, this.$store.getters.AESKey));
         },
         async getRoomInfo() {
             let result = await this.safeRequest({
@@ -92,66 +177,9 @@ export default {
                 data: { roomHash: hash(this.room.roomPassword, config.roomSalt) }
             });
             result = JSON.parse(result);
-            if (result.waitChunkMap) {
-                for (const roomHash in result.waitChunkMap) {
-                    if (!this.roomsInfo[roomHash]) {
-                        continue;
-                    }
-                    for (const fileHash in result.waitChunkMap[roomHash]) {
-                        this.roomsInfo[roomHash].files.some(async fileInfo => {
-                            if (hash(fileInfo.name, config.fileSalt) === fileHash) {
-                                const requestInfo = result.waitChunkMap[roomHash][fileHash];
-                                const roomPassword = this.roomsInfo[roomHash].roomPassword;
-                                const form: any = new FormData();
-                                const blob = fileInfo.file.slice(
-                                    requestInfo[0].position,
-                                    requestInfo[0].position + requestInfo[0].size
-                                );
-                                const encryptedBlob = await encryptBlobToBlob(blob, roomPassword);
-                                // const encrypted = encrypt(
-                                //     await fileInfo.file
-                                //         .slice(
-                                //             requestInfo[0].position,
-                                //             requestInfo[0].position + requestInfo[0].size
-                                //         )
-                                //         .arrayBuffer(),
-                                //     this.roomsInfo[roomHash].roomPassword,
-                                //     true
-                                // );
-                                // const a = CryptoJS.lib.WordArray.create(encrypted);
-                                // const encryptedBlob = new Blob([encrypted]);
-                                // console.log("encrypted", encrypted);
-                                // console.log("encryptedBlob", encryptedBlob);
-                                // console.log(await encryptedBlob.arrayBuffer());
 
-                                // const decryptedBlob = new Blob([decrypted]);
-                                console.log("encryptedBlob", encryptedBlob);
-                                form.append("blob", encryptedBlob);
-                                request({
-                                    method: "push",
-                                    headers: {
-                                        "Content-Type": "multipart/form-data",
-                                        ri: JSON.stringify({
-                                            id: this.id,
-                                            d: encrypt(
-                                                JSON.stringify({
-                                                    position: requestInfo[0].position,
-                                                    size: requestInfo[0].size,
-                                                    roomHash,
-                                                    fileHash
-                                                }),
-                                                this.AESKey
-                                            )
-                                        })
-                                    },
-                                    data: form
-                                });
-                                return true;
-                            }
-                            return false;
-                        });
-                    }
-                }
+            if (result.waitChunkMap) {
+                this.onWaitChunkMap(result.waitChunkMap);
             }
             this.othersInfo = result.others;
         },

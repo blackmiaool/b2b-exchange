@@ -1,7 +1,9 @@
 <template>
     <div class="room" style="height: 100%; padding: 20px; box-sizing: border-box">
         <div style="position: relative">
-            <span v-if="room" style="font-size: 30px; font-weight: bold">{{ room.roomName }}</span>
+            <span v-if="room" style="font-size: 30px; font-weight: bold" :title="roomHash">{{
+                room.roomName
+            }}</span>
             <el-button
                 type="danger"
                 @click="showPassword"
@@ -24,7 +26,11 @@
         </file-upload>
         <div>
             <el-table :data="files" style="width: 100%">
-                <el-table-column prop="name" label="Name" width="280"> </el-table-column>
+                <el-table-column prop="name" label="Name" width="280">
+                    <template v-slot="{ row: { name, hash } }">
+                        <span :title="hash">{{ name }}</span>
+                    </template>
+                </el-table-column>
                 <el-table-column prop="size" label="Size" width="180">
                     <template v-slot="{ row: { size } }">
                         <span>{{ filesize(size) }}</span>
@@ -123,8 +129,13 @@ export default Vue.extend({
             this.files = files;
         },
         onFiles(files) {
-            this.$emit("filesChange", files);
-            this.files = files;
+            this.files = files.map(file => {
+                if (!file.hash) {
+                    file.hash = hash(file.name, config.fileSalt);
+                }
+                return file;
+            });
+            this.$emit("filesChange", this.files);
         },
         showPassword() {
             this.showPasswordDialogVisible = true;

@@ -67,7 +67,7 @@ if (config.local) {
 const port = config.port;
 console.log(`listen on ${port}`);
 
-const server = app.listen(port);
-server.timeout = 15e3;
+app.listen(port);
+// server.timeout = 15e3;
 
 export default app;

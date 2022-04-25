@@ -17,6 +17,14 @@ const store = new Vuex.Store({
         },
         setAESKey(state, AESKey) {
             state.AESKey = AESKey;
+        },
+        getAESKey(state) {
+            return state.AESKey;
+        }
+    },
+    getters: {
+        AESKey(state) {
+            return state.AESKey;
         }
     },
     actions: {

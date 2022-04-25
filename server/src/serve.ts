@@ -55,11 +55,7 @@ router.post("/(.*)", async (ctx) => {
     if (data.id) {
         requestId = data.id;
     }
-    let ri;
-    if (ctx.headers.ri) {
-        ri = JSON.parse(ctx.headers.ri);
-        requestId = ri.id;
-    }
+
     if (requestId) {
         if (data.id && !data.d) {
             console.log("id without d", requestId, data.d);
@@ -80,21 +76,28 @@ router.post("/(.*)", async (ctx) => {
             }
         }
     }
-    if (ri) {
-        try {
-            request = JSON.parse(decrypt(ri.d, AESKey));
-        } catch (e) {
-            console.log("can't decrypt ri", e.message);
-            return;
-        }
-    }
+
     function getSafeBody(body: Record<string, any> | any[]) {
         return encrypt(JSON.stringify(body), AESKey);
     }
+    // function getWaitChunkMap() {
+    //     const ret = {};
+    //     if (waitChunkMap[requestId]) {
+    //         for (const room in waitChunkMap[requestId]) {
+    //             waitChunkMapRet[room] = {};
+    //             for (const file in waitChunkMap[requestId]) {
+    //                 waitChunkMapRet[room][file] = true;
+    //             }
+    //         }
+    //         ret.waitChunkMap = waitChunkMap[requestId];
+    //     }
+    //     return ret;
+    // }
     switch (method) {
         case "push": {
-            const roomChunkRequest = waitChunkMap[requestId][request.roomHash];
-            if (!roomChunkRequest[request.fileHash]) {
+            const roomChunkRequest =
+                waitChunkMap?.[requestId]?.[request.roomHash];
+            if (!roomChunkRequest?.[request.fileHash]) {
                 ctx.status = 200;
                 return;
             }
@@ -110,8 +113,23 @@ router.post("/(.*)", async (ctx) => {
             if (!roomChunkRequest[request.fileHash].length) {
                 delete roomChunkRequest[request.fileHash];
             }
+            if (roomChunkRequest && !Object.keys(roomChunkRequest).length) {
+                delete waitChunkMap[requestId][request.roomHash];
+            }
+            if (
+                waitChunkMap[requestId] &&
+                !Object.keys(waitChunkMap[requestId]).length
+            ) {
+                delete waitChunkMap[requestId];
+            }
+            const ret = {
+                waitChunkMap: null,
+            };
             // console.log("ctx.request.body", ctx.request.files);
-            ctx.body = "ok";
+            if (waitChunkMap[requestId]) {
+                ret.waitChunkMap = waitChunkMap[requestId];
+            }
+            ctx.body = getSafeBody(ret);
             ctx.status = 200;
             break;
         }
@@ -194,15 +212,7 @@ router.post("/(.*)", async (ctx) => {
                 }
             }
             ret.others = others;
-            const waitChunkMapRet = {};
-            // console.log("waitChunkMap[requestId]", waitChunkMap[requestId]);
             if (waitChunkMap[requestId]) {
-                for (const room in waitChunkMap[requestId]) {
-                    waitChunkMapRet[room] = {};
-                    for (const file in waitChunkMap[requestId]) {
-                        waitChunkMapRet[room][file] = true;
-                    }
-                }
                 ret.waitChunkMap = waitChunkMap[requestId];
             }
             ctx.body = getSafeBody(ret);
