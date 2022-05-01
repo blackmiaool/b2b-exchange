@@ -104,26 +104,26 @@ export default {
             try {
                 let fileInfo;
                 let path = { roomHash: "", fileHash: "" };
-                for (const roomHash in waitChunkMap) {
+                for (const url in waitChunkMap) {
+                    const [roomHash, fileHash] = url.split("-");
                     if (!this.roomsInfo[roomHash]) {
                         continue;
                     }
-                    for (const fileHash in waitChunkMap[roomHash]) {
-                        fileInfo = this.roomsInfo[roomHash].files.find(fileInfo => {
-                            return fileInfo.hash === fileHash;
-                        });
-                        if (fileInfo) {
-                            path = {
-                                roomHash,
-                                fileHash
-                            };
-                            break;
-                        }
+
+                    fileInfo = this.roomsInfo[roomHash].files.find(fileInfo => {
+                        return fileInfo.hash === fileHash;
+                    });
+                    if (fileInfo) {
+                        path = {
+                            roomHash,
+                            fileHash
+                        };
+                        break;
                     }
-                    break;
                 }
+                const url = path.roomHash + "-" + path.fileHash;
                 if (fileInfo) {
-                    const requestInfo = waitChunkMap[path.roomHash][path.fileHash];
+                    const requestInfo = waitChunkMap[url];
                     const ret = await this.pushChunk({
                         position: requestInfo[0].position,
                         size: requestInfo[0].size,

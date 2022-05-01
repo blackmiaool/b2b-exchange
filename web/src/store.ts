@@ -3,6 +3,7 @@ import Vuex from "vuex";
 import { decrypt, decryptBlobToBlob, encrypt, hash } from "./common/crypto";
 import { request } from "./common/io";
 import parallelTask from "./common/parallelTask";
+import { getBlobType, isImage } from "./common/utils";
 import config from "./config";
 
 Vue.use(Vuex);
@@ -47,25 +48,7 @@ const store = new Vuex.Store({
             { state },
             { roomHash, roomPassword, fileName, fileSize, from, onProgress }
         ) {
-            const result = await request({
-                method: "download",
-                data: {
-                    id: state.id,
-                    d: encrypt(
-                        JSON.stringify({
-                            roomHash,
-                            id: from,
-                            fileName: encrypt(fileName, roomPassword)
-                        }),
-                        state.AESKey
-                    )
-                }
-            });
-            const info = JSON.parse(decrypt(result, state.AESKey));
-            if (info.code !== 0) {
-                throw new Error(info.message);
-            }
-            const chunkSize = 1e6;
+            const chunkSize = 3e6;
             const lastChunk = fileSize % chunkSize;
             const chunkCount = Math.floor(fileSize / chunkSize) + (lastChunk ? 1 : 0);
             console.log(fileSize, chunkCount, lastChunk);
@@ -88,7 +71,7 @@ const store = new Vuex.Store({
                                         lastChunk && index === chunkCount - 1
                                             ? lastChunk
                                             : chunkSize,
-                                    fileName: hash(fileName, config.fileSalt)
+                                    fileHash: hash(fileName, config.fileSalt)
                                 }),
                                 state.AESKey
                             )
@@ -104,33 +87,17 @@ const store = new Vuex.Store({
                 },
                 5
             );
-            console.log(buffers);
-            const blob = new Blob(buffers);
-            downloadBlob(blob, fileName);
-            function downloadBlob(blob, name = "file.txt") {
-                // For other browsers:
-                // Create a link pointing to the ObjectURL containing the blob.
-                const data = window.URL.createObjectURL(blob);
-
-                const link = document.createElement("a");
-                link.href = data;
-                link.download = name;
-
-                // this is necessary as link.click() does not work on the latest firefox
-                link.dispatchEvent(
-                    new MouseEvent("click", {
-                        bubbles: true,
-                        cancelable: true,
-                        view: window
-                    })
-                );
-
-                setTimeout(() => {
-                    // For Firefox it is necessary to delay revoking the ObjectURL
-                    window.URL.revokeObjectURL(data);
-                    link.remove();
-                }, 100);
+            let blob: Blob;
+            if (isImage(fileName)) {
+                blob = new Blob(buffers, {
+                    type: "image/" + getBlobType(fileName)
+                });
+            } else {
+                blob = new Blob(buffers);
             }
+
+            return blob;
+
             // start download process
         }
     }

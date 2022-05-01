@@ -28,7 +28,10 @@
             <el-table :data="files" style="width: 100%">
                 <el-table-column prop="name" label="Name" width="280">
                     <template v-slot="{ row: { name, hash } }">
-                        <span :title="hash">{{ name }}</span>
+                        <div>
+                            <div :title="hash">{{ name }}</div>
+                            <img v-if="imageBlobMap[name]" :src="imageBlobMap[name]" alt="" />
+                        </div>
                     </template>
                 </el-table-column>
                 <el-table-column prop="size" label="Size" width="180">
@@ -38,7 +41,18 @@
                 </el-table-column>
             </el-table>
             <el-table :data="othersTable" style="width: 100%">
-                <el-table-column prop="name" label="Name" width="280"> </el-table-column>
+                <el-table-column prop="name" label="Name" width="280"
+                    ><template v-slot="{ row: { name, hash } }">
+                        <div>
+                            <div :title="hash">{{ name }}</div>
+                            <img
+                                v-if="imageBlobMap[name]"
+                                :src="imageBlobMap[name]"
+                                alt=""
+                                style="max-width: 100%; max-height: 200px"
+                            />
+                        </div> </template
+                ></el-table-column>
                 <el-table-column prop="size" label="Size" width="180">
                     <template v-slot="{ row: { size } }">
                         <span>{{ filesize(size) }}</span>
@@ -58,6 +72,13 @@
                                 @click="startDownload(file)"
                                 ><i class="el-icon-download"></i> Download</el-button
                             >
+                            <el-button
+                                v-if="!progressMap[file.name] && isText(file.name)"
+                                type="warning"
+                                @click="startPreview(file)"
+                                style="margin-top: 10px"
+                                ><i class="el-icon-download"></i> Preview</el-button
+                            >
                             <el-button v-if="progressMap[file.name]">{{
                                 progressMap[file.name] | percentage
                             }}</el-button>
@@ -73,6 +94,72 @@
                 <el-button type="primary" @click="copyPassword">Copy</el-button>
             </span>
         </el-dialog>
+        <el-dialog
+            title="Paste Image"
+            :visible.sync="showPasteImageVisible"
+            width="30%"
+            :close-on-click-modal="false"
+        >
+            <span style="display: inline-block; margin-bottom: 15px"
+                >Input the file name of your Image</span
+            >
+            <el-input
+                placeholder="Please input file name"
+                v-model="pastedItemName"
+                style="margin-bottom: 15px"
+            ></el-input>
+            <el-button type="success" @click="generateFileName" style="">Generate</el-button>
+            <img
+                :src="pastedItem"
+                style="max-width: 100%; max-height: 100%; display: block; margin: auto"
+            />
+            <span slot="footer" class="dialog-footer">
+                <el-button @click="cancelPaste">Cancel</el-button>
+                <el-button type="primary" @click="confirmPaste" :disabled="!Boolean(pastedItemName)"
+                    >Confirm</el-button
+                >
+            </span>
+        </el-dialog>
+        <el-dialog
+            title="Paste Text"
+            :visible.sync="showPasteTextVisible"
+            width="30%"
+            :close-on-click-modal="false"
+            @close="cancelPaste"
+        >
+            <span style="display: inline-block; margin-bottom: 15px"
+                >Input the file name of your text</span
+            >
+            <el-input
+                placeholder="Please input file name"
+                v-model="pastedItemName"
+                style="margin-bottom: 15px"
+            ></el-input>
+            <el-button type="success" @click="generateFileName" style="">Generate</el-button>
+            <div>
+                {{ pastedItem }}
+            </div>
+            <span slot="footer" class="dialog-footer">
+                <el-button @click="cancelPaste">Cancel</el-button>
+                <el-button type="primary" @click="confirmPaste" :disabled="!Boolean(pastedItemName)"
+                    >Confirm</el-button
+                >
+            </span>
+        </el-dialog>
+        <el-dialog
+            :title="`Preview ${previewingTextFileName}`"
+            :visible.sync="showTextPreview"
+            @close="closeTextPreview"
+            width="30%"
+        >
+            <div>
+                <textarea cols="30" rows="10" :value="previewingText" readonly></textarea>
+            </div>
+            <span slot="footer" class="dialog-footer">
+                <el-button type="primary" @click="copyPreviewingText">Copy</el-button>
+                <el-button type="default" @click="showTextPreview = false">Confirm</el-button>
+            </span>
+        </el-dialog>
     </div>
 </template>
 
@@ -83,6 +170,7 @@ import FileUpload from "vue-upload-component";
 import { decrypt, hash } from "../common/crypto";
 import config from "../config";
 import { mapActions } from "vuex";
+import { getBlobType, isImage, isText } from "../common/utils";
 
 export default Vue.extend({
     name: "RoomComp",
@@ -91,9 +179,57 @@ export default Vue.extend({
         othersInfo: Array
     },
     data() {
-        return { othersTable: [], files: [], showPasswordDialogVisible: false, progressMap: {} };
+        return {
+            previewingTextFileName: "",
+            showTextPreview: false,
+            previewingText: "",
+            showPasteTextVisible: false,
+            pastedBlob: null,
+            pastedItem: "",
+            showPasteImageVisible: false,
+            imageBlobMap: {},
+            othersTable: [],
+            files: [],
+            showPasswordDialogVisible: false,
+            progressMap: {},
+            pastedItemName: "",
+            imageSuffixMap: {
+                jpg: true,
+                jpeg: true,
+                webp: true,
+                png: true,
+                gif: true
+            }
+        };
     },
-    mounted() {},
+    mounted() {
+        document.onpaste = event => {
+            const items = event.clipboardData.items;
+            const pastedText = event.clipboardData.getData("Text");
+            if (pastedText) {
+                this.pastedItem = pastedText;
+                this.showPasteTextVisible = true;
+                this.pastedBlob = new Blob([pastedText]);
+                return;
+            }
+            if (!items.length) {
+                return;
+            }
+            for (const index in items) {
+                const item = items[index];
+                if (item.kind === "file") {
+                    const blob = item.getAsFile();
+                    this.pastedBlob = blob;
+                    const reader = new FileReader();
+                    reader.onload = event => {
+                        this.pastedItem = event.target.result;
+                        this.showPasteImageVisible = true;
+                    };
+                    reader.readAsDataURL(blob);
+                }
+            }
+        };
+    },
     computed: {
         roomHash() {
             if (!this.room) {
@@ -103,11 +239,60 @@ export default Vue.extend({
         }
     },
     methods: {
+        isImage,
+        isText,
         ...mapActions(["safeRequest", "download"]),
-        async startDownload(file) {
-            console.log("start download", file);
+        closeTextPreview() {
+            this.previewingTextFileName = "";
+        },
+        copyPreviewingText() {
+            navigator.clipboard.writeText(this.previewingText);
+        },
+        generateFileName() {
+            const randomNumber = Math.floor(Math.random() * 1e6);
+            this.pastedItemName = String(randomNumber);
+        },
+        cancelPaste() {
+            this.pastedItem = "";
+            this.pastedItemName = "";
+            this.showPasteTextVisible = false;
+            this.showPasteImageVisible = false;
+        },
+        confirmPaste() {
+            if (this.showPasteImageVisible) {
+                const base64 = this.pastedItem;
+                const suffix = base64.slice(0, 20).match(/\/(\w+)/)?.[1] || "";
+
+                const file = new File([this.pastedBlob], `${this.pastedItemName}.${suffix}`, {
+                    type: `image/${getBlobType(`a.${suffix}`)}`,
+                    lastModified: Date.now()
+                });
+                this.$refs.uspload.add(file);
+                this.cancelPaste();
+            } else if (this.showPasteTextVisible) {
+                const file = new File([this.pastedBlob], `${this.pastedItemName}.txt`, {
+                    type: `text/plain`,
+                    lastModified: Date.now()
+                });
+                this.$refs.uspload.add(file);
+                this.cancelPaste();
+            }
+        },
+        async startPreview(file) {
+            if (this.previewingTextFileName) {
+                return;
+            }
+            this.previewingTextFileName = file.name;
+            const blob = await this.fetchBlob(file);
+            if (this.isText(file.name)) {
+                const text = await blob.text();
+                this.previewingText = text;
+                this.showTextPreview = true;
+            }
+        },
+        async fetchBlob(file) {
             this.$set(this.progressMap, file.name, 0.000001);
-            await this.download({
+            const blob = (await this.download({
                 roomHash: this.roomHash,
                 roomPassword: this.room.roomPassword,
                 fileName: file.name,
@@ -117,8 +302,46 @@ export default Vue.extend({
                     this.$set(this.progressMap, file.name, progress);
                     console.log("on", progress);
                 }
-            });
+            })) as Blob;
             this.$delete(this.progressMap, file.name);
+            return blob;
+        },
+        async startDownload(file) {
+            const blob = await this.fetchBlob(file);
+            if (this.isImage(file.name)) {
+                const reader = new FileReader();
+                reader.addEventListener("loadend", () => {
+                    const contents = reader.result;
+                    this.$set(this.imageBlobMap, file.name, contents);
+                });
+                if (blob instanceof Blob) reader.readAsDataURL(blob);
+            } else {
+                this.downloadBlob(blob, file.name);
+            }
+        },
+        downloadBlob(blob, name = "file.txt") {
+            // For other browsers:
+            // Create a link pointing to the ObjectURL containing the blob.
+            const data = window.URL.createObjectURL(blob);
+
+            const link = document.createElement("a");
+            link.href = data;
+            link.download = name;
+
+            // this is necessary as link.click() does not work on the latest firefox
+            link.dispatchEvent(
+                new MouseEvent("click", {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window
+                })
+            );
+
+            setTimeout(() => {
+                // For Firefox it is necessary to delay revoking the ObjectURL
+                window.URL.revokeObjectURL(data);
+                link.remove();
+            }, 100);
         },
         setFiles(files) {
             this.files = files;
