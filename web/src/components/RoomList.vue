@@ -1,30 +1,51 @@
 <template>
-    <div style="background-color: rgb(84, 92, 100); height: 100%; position: relative">
+    <div
+        class="room-list"
+        style="background-color: rgb(84, 92, 100); height: 100%; position: relative"
+    >
         <header>
             <section class="room-tab"></section>
         </header>
         <main>
-            <el-menu
-                default-active="0"
-                class="el-menu-vertical-demo"
-                background-color="#545c64"
-                text-color="#fff"
-                active-text-color="#ffd04b"
-                @select="onSelect"
-            >
-                <el-menu-item
-                    v-for="(room, i) in roomList"
-                    :key="room.roomName"
-                    class="clickable room-title"
-                    :index="String(i)"
+            <ul style="margin: 0; color: white; padding: 0">
+                <li
+                    :class="{
+                        active: selected ? li.roomName === selected.roomName : false,
+                        'menu-li': true
+                    }"
+                    v-for="(li, index) in roomList"
+                    :key="index"
+                    @click="onSelect(index)"
                 >
-                    <i class="el-icon-menu"></i>
-                    <span>{{ room.roomName }}</span>
-                </el-menu-item>
-            </el-menu>
+                    <i class="el-icon-menu"></i> {{ li.roomName }}
+                </li>
+            </ul>
         </main>
         <footer style="position: absolute; left: 0; right: 0; bottom: 0">
-            <el-button type="primary" @click="addRoom">Add</el-button>
+            <i
+                class="el-icon-setting"
+                style="
+                    position: absolute;
+                    left: 5px;
+                    bottom: 45px;
+                    color: white;
+                    font-size: 45px;
+                    cursor: pointer;
+                "
+                @click="onSettings"
+            ></i>
+            <el-button
+                type="primary"
+                @click="addRoom"
+                style="width: 50%; position: absolute; left: 0; bottom: 0"
+                >Add</el-button
+            >
+            <el-button
+                type="danger"
+                @click="deleteRoom"
+                style="width: 50%; position: absolute; right: 0; bottom: 0"
+                >Delete</el-button
+            >
         </footer>
         <el-dialog
             title="Add Room"
@@ -46,12 +67,14 @@
 
 <script lang="ts">
 import { hash } from "../common/crypto";
-import config from "../config";
+import config from "../config-loader";
+import Vue from "vue";
+
 export default {
     name: "RoomList",
     data() {
         return {
-            configKey: "b2b-exchange-config",
+            configKey: "b2b-exchange-room-list",
             roomList: [],
             roomName: "",
             roomPassword: "",
@@ -63,13 +86,25 @@ export default {
         this.initConfig();
     },
     mounted() {
-        this.onSelect(0);
+        if (this.roomList.length) {
+            this.onSelect(0);
+        }
     },
     methods: {
+        onSettings() {
+            this.onSelect(null);
+            this.$emit("settings");
+        },
         onSelect(index) {
-            this.selected = this.roomList[index];
-            const roomHash = hash(this.selected.roomPassword, config.roomSalt);
-            this.$emit("select", { ...this.selected, hash: roomHash });
+            if (index === null || index === undefined) {
+                this.selected = null;
+                this.$emit("select", null);
+            } else {
+                this.selected = this.roomList[index];
+                const roomHash = hash(this.selected.roomPassword, config.roomSalt);
+                this.$emit("select", { ...this.selected, hash: roomHash });
+            }
+            console.log("on select", index);
         },
         onConfirmAddRoom() {
             if (!this.roomName || !this.roomPassword) {
@@ -86,7 +121,14 @@ export default {
             });
             this.syncConfig();
             this.dialogVisible = false;
+
             this.$emit("roomList", this.roomList);
+            if (!this.selected) {
+                this.onSelect(0);
+            }
+            console.log("on confirm", this.selected);
+            this.roomName = "";
+            this.roomPassword = "";
         },
         initConfig() {
             try {
@@ -103,6 +145,28 @@ export default {
         addRoom() {
             this.dialogVisible = true;
         },
+        deleteRoom() {
+            this.$confirm(`Are you sure to delete room "${this.selected.roomName}"?`)
+                .then(() => {
+                    this.roomList = this.roomList.filter(({ roomName }) => {
+                        return this.selected.roomName !== roomName;
+                    });
+                    // if (this.roomList.length) {
+                    //     this.onSelect(0);
+                    // }
+                    this.syncConfig();
+                    if (!this.roomList.length) {
+                        this.onSelect(null);
+                    } else {
+                        Vue.nextTick(() => {
+                            (
+                                document.querySelector(".room-list li[role='menuitem']") as any
+                            )?.click();
+                        });
+                    }
+                })
+                .catch(() => {});
+        },
         handleClose(done) {
             this.$confirm("Are you sure to close this dialog?")
                 .then(() => {
@@ -110,11 +174,20 @@ export default {
                 })
                 .catch(() => {});
         }
-    },
-    components: {}
+    }
 };
 </script>
 <style>
-.room-title:hover {
+.menu-li {
+    list-style: none;
+    padding: 15px 0px 15px 20px;
+    cursor: pointer;
+}
+.menu-li.active {
+    color: rgb(255, 208, 75);
+}
+
+.menu-li:hover {
+    background-color: rgba(67, 74, 80);
 }
 </style>

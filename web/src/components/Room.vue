@@ -41,7 +41,7 @@
                 </el-table-column>
             </el-table>
             <el-table :data="othersTable" style="width: 100%">
-                <el-table-column prop="name" label="Name" width="280"
+                <el-table-column prop="name" label="Name" width="200"
                     ><template v-slot="{ row: { name, hash } }">
                         <div>
                             <div :title="hash">{{ name }}</div>
@@ -168,7 +168,7 @@ import filesize from "filesize";
 import Vue from "vue";
 import FileUpload from "vue-upload-component";
 import { decrypt, hash } from "../common/crypto";
-import config from "../config";
+import config from "../config-loader";
 import { mapActions } from "vuex";
 import { getBlobType, isImage, isText } from "../common/utils";
 
@@ -204,6 +204,10 @@ export default Vue.extend({
     },
     mounted() {
         document.onpaste = event => {
+            const dialogExist = this.checkDialogExist();
+            if (dialogExist) {
+                return;
+            }
             const items = event.clipboardData.items;
             const pastedText = event.clipboardData.getData("Text");
             if (pastedText) {
@@ -242,6 +246,15 @@ export default Vue.extend({
         isImage,
         isText,
         ...mapActions(["safeRequest", "download"]),
+        checkDialogExist() {
+            let ret = false;
+            document.querySelectorAll(`.el-dialog__wrapper`).forEach(li => {
+                if ((li as any)?.style.display !== "none") {
+                    ret = true;
+                }
+            });
+            return ret;
+        },
         closeTextPreview() {
             this.previewingTextFileName = "";
         },

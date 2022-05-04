@@ -4,7 +4,7 @@ import { decrypt, decryptBlobToBlob, encrypt, hash } from "./common/crypto";
 import { request } from "./common/io";
 import parallelTask from "./common/parallelTask";
 import { getBlobType, isImage } from "./common/utils";
-import config from "./config";
+import config from "./config-loader";
 
 Vue.use(Vuex);
 const store = new Vuex.Store({

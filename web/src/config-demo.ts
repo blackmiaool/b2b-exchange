@@ -1,6 +1,6 @@
 export default {
     pubicKey: "",
-    port: 0,
+    origin: "http://localhost:1234",
     roomSalt: "",
     aesSalt: ""
 };

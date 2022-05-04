@@ -1,17 +1,30 @@
 <template>
     <div class="home" style="height: 100%; display: flex">
-        <div class="left" style="height: 100%; max-width: 300px; width: 30%; flex: 1">
-            <RoomList @select="onSelect" @roomList="onRoomList" />
+        <div class="left" style="height: 100%; max-width: 250px; width: 30%; flex: 1">
+            <RoomList @select="onSelect" @roomList="onRoomList" @settings="onSettings" />
         </div>
         <div class="right" style="height: 100%; flex: 1">
             <Room
                 ref="room"
+                v-if="room && showingTab === 'room'"
                 :room="room"
                 @filesChange="onFilesChange($event, room)"
                 :othersInfo="othersInfo"
             />
+            <Guide v-if="showingTab === 'guide'" />
+            <Settings v-if="showingTab === 'settings'" />
         </div>
-        <div class="bottom" style="position: absolute; bottom: 0; left: 0; right: 0; height: 20px">
+        <div
+            class="bottom"
+            style="
+                position: absolute;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                height: 20px;
+                pointer-events: none;
+            "
+        >
             <div style="position: absolute; right: 5px">{{ id.slice(0, 15) }}</div>
         </div>
     </div>
@@ -20,18 +33,22 @@
 <script lang="ts">
 import RoomList from "../components/RoomList.vue";
 import Room from "../components/Room.vue";
-import config from "../config";
+import config from "../config-loader";
 import JSEncrypt from "jsencrypt";
 import { request } from "../common/io";
 import { decrypt, encrypt, encryptBlobToBlob, hash } from "../common/crypto";
 import { mapActions, mapMutations } from "vuex";
+import Vue from "vue";
 import { AnyMap } from "../common/types";
+import Guide from "../components/Guide.vue";
+import Settings from "../components/Settings.vue";
 
 export default {
     name: "HomeView",
     data() {
         // const id = Math.floor(Math.random() * 1e5);
         return {
+            showingTab: "guide", // settings, room, guide
             processingChunk: false,
             intervalList: [],
             id: "HomeView",
@@ -84,6 +101,9 @@ export default {
     methods: {
         ...mapMutations(["getAESKey"]),
         ...mapActions(["safeRequest"]),
+        onSettings() {
+            this.showingTab = "settings";
+        },
         exit() {
             request({
                 method: "exit",
@@ -180,6 +200,9 @@ export default {
             return JSON.parse(decrypt(result, this.$store.getters.AESKey));
         },
         async getRoomInfo() {
+            if (!this.room) {
+                return;
+            }
             let result = await this.safeRequest({
                 method: "getRoomInfo",
                 data: { roomHash: this.room.hash }
@@ -229,15 +252,30 @@ export default {
             this.ping();
         },
         onSelect(room) {
+            if (!room && this.showingTab !== "settings") {
+                this.showingTab = "guide";
+            }
+            if (room) {
+                this.showingTab = "room";
+            }
+            console.log("room", room);
             this.room = room;
-            this.$refs.room.setFiles(this.roomsInfo[room.hash].files);
-            this.othersInfo = [];
-            this.getRoomInfo();
+            Vue.nextTick(() => {
+                if (this.room) {
+                    this.$refs.room.setFiles(this.roomsInfo[room.hash].files);
+                }
+                this.othersInfo = [];
+                if (this.room) {
+                    this.getRoomInfo();
+                }
+            });
         }
     },
     components: {
         RoomList,
-        Room
+        Room,
+        Guide,
+        Settings
     }
 };
 </script>

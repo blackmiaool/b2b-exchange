@@ -1,5 +1,5 @@
 import axios from "axios";
-import config from "../config";
+import config from "../config-loader";
 import { AnyMap } from "./types";
 
 export function request({
@@ -13,7 +13,7 @@ export function request({
     data?: AnyMap;
     responseType?: any;
 }): Promise<any> {
-    const origin = `http://${config.server}:${config.port}`;
+    const origin = config.origin;
     return axios({
         method: "POST",
         url: `${origin}/${method}`,
