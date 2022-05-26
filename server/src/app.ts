@@ -8,8 +8,8 @@ app.use(
     koaBody({
         formidable: {},
         multipart: true,
-        formLimit: "10mb",
-        jsonLimit: "10mb",
+        formLimit: "20mb",
+        jsonLimit: "20mb",
     })
 );
 declare global {
