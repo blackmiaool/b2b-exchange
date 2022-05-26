@@ -48,7 +48,7 @@ const store = new Vuex.Store({
             { state },
             { roomHash, roomPassword, fileName, fileSize, from, onProgress }
         ) {
-            const chunkSize = 3e6;
+            const chunkSize = 1e6;
             const lastChunk = fileSize % chunkSize;
             const chunkCount = Math.floor(fileSize / chunkSize) + (lastChunk ? 1 : 0);
             console.log(fileSize, chunkCount, lastChunk);
